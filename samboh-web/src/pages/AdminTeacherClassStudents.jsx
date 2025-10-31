@@ -17,7 +17,7 @@ export default function AdminTeacherClassStudents() {
     if (!token) nav("/");
   }, [nav]);
 
-  // 학생 JSON 로딩
+  // 데이터 로딩
   useEffect(() => {
     setLoading(true);
     const url =
@@ -30,10 +30,10 @@ export default function AdminTeacherClassStudents() {
       .finally(() => setLoading(false));
   }, [division]);
 
-  // ✅ 기준일 메타 로딩
+  // 기준일 로딩
   useEffect(() => {
     fetch("/data/roster-meta.json")
-      .then((r) => r.ok ? r.json() : {})
+      .then((r) => (r.ok ? r.json() : {}))
       .then((m) => {
         const label = m?.[division]?.label || m?.[division]?.yyyymmdd || "";
         setBaseline(label);
@@ -44,7 +44,13 @@ export default function AdminTeacherClassStudents() {
   // 해당 반 학생만
   const rows = useMemo(() => {
     const students = data?.[teacherName] || [];
-    return students.filter(s => (s.반명 || "").trim() === className);
+    return students
+      .filter((s) => (s.반명 || "").trim() === className)
+      .sort((a, b) => {
+        const ga = Number(a.학년 || 0), gb = Number(b.학년 || 0);
+        if (ga !== gb) return ga - gb;
+        return String(a.성명).localeCompare(String(b.성명), "ko");
+      });
   }, [data, teacherName, className]);
 
   return (
@@ -53,7 +59,6 @@ export default function AdminTeacherClassStudents() {
         <div style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}}>
           <button onClick={()=>nav(`/admin/${division}/${encodeURIComponent(teacherName)}`)} style={st.backBtn}>←</button>
           <strong>{teacherName} 담임 — {className}</strong>
-          {/* ✅ 헤더에 기준일 표시 */}
           {baseline ? <span style={{opacity:.95,fontSize:13}}> · 기준일: <b>{baseline}</b></span> : null}
         </div>
         <a href="/" style={st.link}>로그아웃</a>

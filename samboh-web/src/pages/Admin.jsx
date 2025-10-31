@@ -1,111 +1,129 @@
-// src/pages/Admin.jsx
 import { useEffect, useMemo, useState } from "react";
 
-// 25년 8월 중등 기준일(251022) 반별 재원 데이터 기반 관리자 대시보드
+/**
+ * Admin 전체 성적 뷰 (중등)
+ * - roster-meta.json의 기준일을 읽어 해당 기준일 파일(score_2508_middle_YYYMMDD.json)을 우선 로드
+ * - 실패 시 sample-중등.json으로 폴백
+ * - score 파일의 필드를 화면용(KR 키)으로 매핑하여 표출
+ */
 export default function Admin() {
-  const [data, setData] = useState(null);          // 성적+재원 데이터
-  const [idx, setIdx] = useState(null);            // 반별 인덱스
-  const [cls, setCls] = useState("");              // 반 선택
-  const [q, setQ] = useState("");                  // 검색
-  const [adminView, setAdminView] = useState(false);
+  const [rows, setRows] = useState([]);
+  const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
+  const [baseline, setBaseline] = useState("");  // 기준일 (예: 251022)
+  const [session, setSession] = useState("");    // 회차 (예: 2508)
 
   useEffect(() => {
-    Promise.all([
-      fetch("/data/score_2508_middle_251022.json").then(r => r.json()),
-      fetch("/data/index_2508_by_class_251022.json").then(r => r.json()),
-    ])
-      .then(([score, index]) => {
-        setData(score);
-        setIdx(index);
-      })
-      .finally(() => setLoading(false));
+    let meta = null;
+    (async () => {
+      try {
+        const mr = await fetch("/data/roster-meta.json");
+        if (mr.ok) {
+          meta = await mr.json();
+          const yyyymmdd = meta?.middle?.yyyymmdd || meta?.middle?.label || "";
+          setBaseline(yyyymmdd);
+          // 현재 운영 회차는 업로드 파일명에서 고정(2508). 필요 시 roster-meta.json에 session을 추가해도 됨.
+          const url = `/data/score_2508_middle_${yyyymmdd}.json`;
+          const r = await fetch(url);
+          if (r.ok) {
+            const d = await r.json();
+            setSession(d?.session || "2508");
+            // d.students => 화면용으로 매핑
+            const mapped = (d?.students || []).map((s) => ({
+              식별번호: s.id,
+              성명: s.name,
+              학교명: s.school,
+              학년: s.grade,
+              레벨: s.level,
+              반명: s.class,
+              담임: s.teacher,
+              GR: s.gr,
+              RC: s.rc,
+              총점: s.total,
+              회차: d?.session || "2508",
+              구분: "중등",
+            }));
+            setRows(mapped);
+            return;
+          }
+        }
+      } catch (e) {
+        // ignore -> fallback
+      }
+      // 폴백: 샘플
+      try {
+        const r2 = await fetch("/data/sample-중등.json");
+        const d2 = await r2.json();
+        setRows(d2);
+      } finally {
+        setLoading(false);
+      }
+    })().finally(() => setLoading(false));
   }, []);
 
-  const allRows = useMemo(() => {
-    if (!data) return [];
-    return adminView ? data.students : data.students.filter(s => s.is_active_251022);
-  }, [data, adminView]);
-
   const filtered = useMemo(() => {
-    if (!idx) return allRows;
-    const query = q.trim();
-    let base = allRows;
-
-    if (cls) {
-      const allow = new Set(idx.by_class[cls] || []);
-      base = base.filter(s => allow.has(s.id));
-    }
-    if (query) {
-      base = base.filter((r) =>
-        [r.id, r.name, r.school, r.level, r.teacher]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(query.toLowerCase()))
-      );
-    }
-    return base;
-  }, [allRows, q, cls, idx]);
-
-  const classList = useMemo(() => idx ? Object.keys(idx.by_class).sort() : [], [idx]);
+    if (!q.trim()) return rows;
+    const x = q.trim();
+    return rows.filter((r) =>
+      [r.식별번호, r.성명, r.학교명, r.레벨, r.담임, r.반명, r.회차]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(x.toLowerCase()))
+    );
+  }, [rows, q]);
 
   return (
     <div style={st.page}>
       <header style={st.header}>
-        <h1 style={{margin:0}}>중등 관리자 대시보드</h1>
-        <div style={{display:"flex",gap:8,alignItems:"center"}}>
-          <label style={{fontSize:13}}>
-            <input type="checkbox" checked={adminView} onChange={(e)=>setAdminView(e.target.checked)} /> 관리자 보기
-          </label>
+        <strong>관리자 대시보드 — 전체 성적(중등)</strong>
+        <div style={{display:"flex", alignItems:"center", gap:10}}>
+          {session ? <span style={{opacity:.9}}>회차: <b>{session}</b></span> : null}
+          {baseline ? <span style={{opacity:.9}}>· 기준일: <b>{baseline}</b></span> : null}
           <a href="/" style={st.link}>로그아웃</a>
         </div>
       </header>
 
       <main style={st.main}>
         <section style={st.card}>
-          <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:10}}>
+          <div style={{display:"flex", gap:10, alignItems:"center", marginBottom: 10}}>
             <input
-              placeholder="식별번호/이름/학교/레벨/담임 검색"
+              placeholder="식별번호/이름/학교/레벨/담임/반명/회차 검색"
               value={q}
               onChange={(e)=>setQ(e.target.value)}
               style={st.search}
             />
-            <select value={cls} onChange={(e)=>setCls(e.target.value)} style={st.select}>
-              <option value="">반 전체</option>
-              {classList.map((c)=>(
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
             <span style={{opacity:.9,fontSize:12,color:"#DDE8FF"}}>
-              {loading ? "불러오는 중…" : `총 ${filtered.length.toLocaleString()}명`}
+              총 {filtered.length.toLocaleString()}명
             </span>
           </div>
 
-          <div style={{overflow:"auto", maxHeight:"65svh", border:"1px solid rgba(255,255,255,.1)", borderRadius:12}}>
+          <div style={{overflow:"auto", maxHeight:"60svh", border:"1px solid rgba(255,255,255,.1)", borderRadius:12}}>
             <table style={st.table}>
               <thead>
                 <tr>
-                  {["식별번호","성명","학교명","학년","반명","레벨","담임","GR","RC","총점","재원"].map(h=>(<th key={h}>{h}</th>))}
+                  {["식별번호","성명","학교명","학년","레벨","담임","GR","RC","총점","회차","반명"].map(h=>(
+                    <th key={h}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={11} style={{textAlign:"center",padding:16}}>불러오는 중…</td></tr>
+                  <tr><td colSpan={11} style={{textAlign:"center", padding:16}}>불러오는 중…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={11} style={{textAlign:"center",padding:16}}>결과가 없습니다.</td></tr>
+                  <tr><td colSpan={11} style={{textAlign:"center", padding:16}}>결과가 없습니다.</td></tr>
                 ) : (
                   filtered.map((r)=>(
-                    <tr key={r.id}>
-                      <td>{r.id}</td>
-                      <td>{r.name ?? "-"}</td>
-                      <td>{r.school ?? "-"}</td>
-                      <td>{r.grade ?? "-"}</td>
-                      <td>{r.class ?? "-"}</td>
-                      <td>{r.level ?? "-"}</td>
-                      <td>{r.teacher ?? "-"}</td>
-                      <td>{r.gr}</td>
-                      <td>{r.rc}</td>
-                      <td style={{fontWeight:700}}>{r.total}</td>
-                      <td style={{textAlign:"center"}}>{r.is_active_251022 ? "Y" : (adminView ? "N" : "")}</td>
+                    <tr key={`${r.식별번호}-${r.회차}`}>
+                      <td>{r.식별번호}</td>
+                      <td>{r.성명}</td>
+                      <td>{r.학교명}</td>
+                      <td>{r.학년}</td>
+                      <td>{r.레벨}</td>
+                      <td>{r.담임}</td>
+                      <td>{r.GR}</td>
+                      <td>{r.RC}</td>
+                      <td>{r.총점}</td>
+                      <td>{r.회차}</td>
+                      <td>{r.반명}</td>
                     </tr>
                   ))
                 )}
@@ -121,14 +139,14 @@ export default function Admin() {
 const st = {
   page: {
     minHeight:"100svh", background:"#0E5FD7", color:"#fff",
-    fontFamily:'system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Helvetica, Arial',
+    fontFamily:'system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Helvetica, Arial'
   },
   header: {
     display:"flex", alignItems:"center", justifyContent:"space-between",
     padding:"14px 18px", borderBottom:"1px solid rgba(255,255,255,.2)"
   },
   link: { color:"#fff", textDecoration:"underline" },
-  main: { width:"min(1100px,94vw)", margin:"20px auto" },
+  main: { width:"min(1100px, 94vw)", margin:"20px auto" },
   card: {
     background:"linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02))",
     border:"1px solid rgba(255,255,255,.09)", borderRadius:16, padding:14,
@@ -136,10 +154,6 @@ const st = {
   },
   search: {
     flex:"1 1 auto", minWidth:240,
-    padding:"10px 12px", borderRadius:10, border:"1px solid #20304e",
-    background:"rgba(7,19,48,.35)", color:"#fff", outline:"none"
-  },
-  select: {
     padding:"10px 12px", borderRadius:10, border:"1px solid #20304e",
     background:"rgba(7,19,48,.35)", color:"#fff", outline:"none"
   },
