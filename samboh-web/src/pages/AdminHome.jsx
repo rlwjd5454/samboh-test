@@ -22,12 +22,19 @@ export default function AdminHome() {
       <main style={st.main}>
         <section style={st.card}>
           <h2 style={{marginTop:0,marginBottom:14}}>학년 선택</h2>
-          <p style={{marginTop:0,opacity:.9}}>먼저 조회할 구분을 선택하세요.</p>
+          <p style={{marginTop:0,opacity:.9}}>조회 항목을 선택하세요.</p>
 
           <div style={st.grid}>
+            {/* ✅ 중등 전체 성적 바로가기 */}
+            <button style={st.tile} onClick={()=>nav("/admin/middle/2508-list")}>
+              <div style={st.tileTitle}>중등 전체 성적(2508)</div>
+              <div style={st.tileDesc}>기준일 적용 · 재원생 기본 노출</div>
+            </button>
+
+            {/* 담임/반 탐색 플로우 */}
             <button style={st.tile} onClick={()=>nav("/admin/middle")}>
-              <div style={st.tileTitle}>중등</div>
-              <div style={st.tileDesc}>P / M / H</div>
+              <div style={st.tileTitle}>중등 담임별</div>
+              <div style={st.tileDesc}>담임 → 반 → 학생</div>
             </button>
 
             <button style={st.tile} onClick={()=>nav("/admin/elementary")}>
@@ -55,6 +62,6 @@ const st = {
   tile: { border:0, borderRadius:14, padding:"18px 16px", textAlign:"left",
     background:"#0b3f9d", color:"#fff", cursor:"pointer",
     boxShadow:"0 10px 24px rgba(0,0,0,.15)" },
-  tileTitle: { fontSize:20, fontWeight:800, marginBottom:6 },
+  tileTitle: { fontSize:18, fontWeight:800, marginBottom:6 },
   tileDesc: { opacity:.95, fontSize:13 }
 };
