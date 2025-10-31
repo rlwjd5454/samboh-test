@@ -6,3 +6,7 @@ Thumbs.db
 *.log
 **/.env*
 coverage/
+# 보안 파일 제외
+.env
+.env.*
+public/config.json

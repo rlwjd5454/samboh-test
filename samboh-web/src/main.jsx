@@ -1,13 +1,18 @@
+// src/main.jsx
 import React from "react";
-import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
+import ReactDOM from "react-dom/client";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import Login from "./pages/Login.jsx";
 
-const root = createRoot(document.getElementById("root"));
-root.render(
+const router = createBrowserRouter([
+  { path: "/", element: <Login /> },
+  { path: "/login", element: <Login /> },
+  // { path: "/admin", element: <div>admin</div> },
+  // { path: "/student", element: <div>student</div> },
+]);
+
+ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
+    <RouterProvider router={router} />
   </React.StrictMode>
 );

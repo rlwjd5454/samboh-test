@@ -1,199 +1,60 @@
-import { useEffect, useState, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+
+// 초기 화면(로그인) – 로고/관리자ID 포함 버전이 이미 존재함
+import Login from "./pages/Login";
+
+// 관리자 영역
+import AdminHome from "./pages/AdminHome";
+import Admin from "./pages/Admin";
+import AdminTeachers from "./pages/AdminTeachers";
+import AdminTeacherClasses from "./pages/AdminTeacherClasses";
+import AdminTeacherStudents from "./pages/AdminTeacherStudents";
+
+// 교사/학부모 포털
+import Teacher from "./pages/Teacher";
+import Parent from "./pages/Parent";
+
+// 학생 개별 상세
+import StudentDetail from "./pages/StudentDetail";
 
 /**
- * Samboh 학생 개별 성적 페이지
- * - /student/:id 경로에서 학생의 모든 회차 성적 조회
- * - 데이터는 /api/students/:id 또는 /data/student_records.json에서 로드
+ * 라우팅 복구/정리
+ * - 초기 진입: 로그인 화면 유지
+ * - 관리자 대시보드/교사/학부모/학생 상세 등 기존 페이지 경로 복원
+ * - 정의되지 않은 경로는 /login 으로
  */
-
-async function fetchStudentById(id) {
-  // 1️⃣ API 우선
-  try {
-    const r = await fetch(`/api/students/${encodeURIComponent(id)}`);
-    if (r.ok) {
-      const data = await r.json();
-      if (data && (data.records?.length || data.name)) return data;
-    }
-  } catch (_) {}
-
-  // 2️⃣ 정적 JSON (public/data/student_records.json)
-  try {
-    const r2 = await fetch("/data/student_records.json");
-    if (r2.ok) {
-      const map = await r2.json();
-      const row = map?.[id];
-      if (row) return row;
-    }
-  } catch (_) {}
-
-  // 3️⃣ window 변수 (선택)
-  const local = window.__SAMBO_STUDENT__?.[id];
-  if (local) return local;
-
-  return null;
-}
-
-export default function StudentDetail() {
-  const { id } = useParams();
-  const [student, setStudent] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError("");
-    fetchStudentById(id)
-      .then((data) => {
-        if (!active) return;
-        if (!data) setError("학생 데이터를 찾을 수 없습니다.");
-        else {
-          const sorted = [...(data.records ?? [])].sort((a, b) =>
-            String(a.session).localeCompare(String(b.session))
-          );
-          setStudent({ ...data, records: sorted });
-        }
-      })
-      .catch(() => setError("데이터를 불러오는 중 오류 발생"))
-      .finally(() => setLoading(false));
-    return () => {
-      active = false;
-    };
-  }, [id]);
-
-  const summary = useMemo(() => {
-    if (!student?.records?.length) return null;
-    const n = student.records.length;
-    const total = student.records.reduce(
-      (acc, r) => {
-        acc.GR += Number(r.GR || 0);
-        acc.RC += Number(r.RC || 0);
-        acc.Total += Number(r.Total || 0);
-        return acc;
-      },
-      { GR: 0, RC: 0, Total: 0 }
-    );
-    return {
-      count: n,
-      GR: (total.GR / n).toFixed(1),
-      RC: (total.RC / n).toFixed(1),
-      Total: (total.Total / n).toFixed(1),
-    };
-  }, [student]);
-
+export default function App() {
   return (
-    <div className="max-w-5xl mx-auto p-4">
-      <div className="mb-4 text-sm text-gray-500">
-        <Link to="/" className="hover:underline">
-          ← 돌아가기
-        </Link>
-      </div>
+    <Routes>
+      {/* 초기화면 & 로그인 */}
+      <Route path="/" element={<Login />} />
+      <Route path="/login" element={<Login />} />
 
-      <h1 className="text-2xl font-bold mb-4">학생 성적 상세</h1>
+      {/* 관리자 홈/대시보드 */}
+      <Route path="/admin" element={<AdminHome />} />
+      <Route path="/admin/home" element={<AdminHome />} />
+      <Route path="/admin/scores" element={<Admin />} />
 
-      {loading && <p>불러오는 중...</p>}
-      {!loading && error && <p className="text-red-600">{error}</p>}
-      {!loading && student && (
-        <>
-          <div className="rounded-lg border p-4 mb-6">
-            <div className="flex flex-wrap gap-6">
-              <div>
-                <div className="text-xs text-gray-500">식별번호</div>
-                <div className="font-mono text-lg">{id}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500">이름</div>
-                <div className="text-lg">{student.name ?? "-"}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500">학교</div>
-                <div className="text-lg">{student.school ?? "-"}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-500">학년</div>
-                <div className="text-lg">{student.grade ?? "-"}</div>
-              </div>
-              {summary && (
-                <div className="ml-auto">
-                  <div className="text-xs text-gray-500">회차 수</div>
-                  <div className="text-lg">{summary.count}</div>
-                </div>
-              )}
-            </div>
-          </div>
+      {/* 관리자 - 선생님/반/학생 뷰 (division: middle | elementary) */}
+      <Route path="/admin/:division/teachers" element={<AdminTeachers />} />
+      <Route
+        path="/admin/:division/teacher/:teacher/classes"
+        element={<AdminTeacherClasses />}
+      />
+      <Route
+        path="/admin/:division/teacher/:teacher/students"
+        element={<AdminTeacherStudents />}
+      />
 
-          {summary && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-              <div className="rounded-lg border p-4">
-                <div className="text-xs text-gray-500">평균 GR</div>
-                <div className="text-2xl font-semibold">{summary.GR}</div>
-              </div>
-              <div className="rounded-lg border p-4">
-                <div className="text-xs text-gray-500">평균 RC</div>
-                <div className="text-2xl font-semibold">{summary.RC}</div>
-              </div>
-              <div className="rounded-lg border p-4">
-                <div className="text-xs text-gray-500">평균 총점</div>
-                <div className="text-2xl font-semibold">{summary.Total}</div>
-              </div>
-            </div>
-          )}
+      {/* 교사/학부모 포털 (향후 확장용) */}
+      <Route path="/teacher" element={<Teacher />} />
+      <Route path="/parent" element={<Parent />} />
 
-          <div className="overflow-x-auto rounded-lg border">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left">
-                <tr>
-                  <th className="px-3 py-2">회차</th>
-                  <th className="px-3 py-2">GR</th>
-                  <th className="px-3 py-2">RC</th>
-                  <th className="px-3 py-2">총점</th>
-                  <th className="px-3 py-2">레벨</th>
-                  <th className="px-3 py-2">시험지</th>
-                </tr>
-              </thead>
-              <tbody>
-                {student.records.map((r) => (
-                  <tr key={r.session} className="border-t hover:bg-gray-50">
-                    <td className="px-3 py-2 font-mono">{r.session}</td>
-                    <td className="px-3 py-2">{r.GR ?? "-"}</td>
-                    <td className="px-3 py-2">{r.RC ?? "-"}</td>
-                    <td className="px-3 py-2 font-semibold">{r.Total ?? "-"}</td>
-                    <td className="px-3 py-2">{r.level ?? "-"}</td>
-                    <td className="px-3 py-2">
-                      {pdfHref(r.session) ? (
-                        <a
-                          className="text-blue-600 hover:underline"
-                          href={pdfHref(r.session)}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          보기
-                        </a>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {!student.records.length && (
-                  <tr>
-                    <td colSpan="6" className="text-center text-gray-500 py-6">
-                      표시할 성적이 없습니다.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-    </div>
+      {/* 학생 개별 상세 페이지 */}
+      <Route path="/student/:id" element={<StudentDetail />} />
+
+      {/* 잘못된 경로 → 로그인 */}
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
   );
-}
-
-function pdfHref(session) {
-  // public/papers/시험지_2508_P1~H6_과정평가.pdf 형태로 연결
-  const fname = `시험지_${session}_P1~H6_과정평가.pdf`;
-  return `/papers/${encodeURIComponent(fname)}`;
 }
