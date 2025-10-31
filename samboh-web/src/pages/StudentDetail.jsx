@@ -1,33 +1,32 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 
-/**
- * Samboh 학생 개별 성적 페이지
- * - /student/:id 경로에서 학생의 모든 회차 성적 조회
- * - 데이터는 /api/students/:id 또는 /data/student_records.json에서 로드
- */
-
+/** /student/:id 에서 학생 모든 회차 성적 표시 */
 async function fetchStudentById(id) {
-  // 1️⃣ API 우선
+  // 1) 백엔드 API 우선
   try {
-    const r = await fetch(`/api/students/${encodeURIComponent(id)}`);
+    const r = await fetch(`/api/students/${encodeURIComponent(id)}`, {
+      headers: { Accept: "application/json" },
+    });
     if (r.ok) {
       const data = await r.json();
       if (data && (data.records?.length || data.name)) return data;
     }
-  } catch (_) {}
+  } catch {}
 
-  // 2️⃣ 정적 JSON (public/data/student_records.json)
+  // 2) 정적 맵: public/data/student_records.json
   try {
-    const r2 = await fetch("/data/student_records.json");
+    const r2 = await fetch("/data/student_records.json", {
+      headers: { Accept: "application/json" },
+    });
     if (r2.ok) {
       const map = await r2.json();
       const row = map?.[id];
       if (row) return row;
     }
-  } catch (_) {}
+  } catch {}
 
-  // 3️⃣ window 변수 (선택)
+  // 3) window 변수 (선택)
   const local = window.__SAMBO_STUDENT__?.[id];
   if (local) return local;
 
@@ -41,12 +40,12 @@ export default function StudentDetail() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    let active = true;
+    let alive = true;
     setLoading(true);
     setError("");
     fetchStudentById(id)
       .then((data) => {
-        if (!active) return;
+        if (!alive) return;
         if (!data) setError("학생 데이터를 찾을 수 없습니다.");
         else {
           const sorted = [...(data.records ?? [])].sort((a, b) =>
@@ -55,17 +54,17 @@ export default function StudentDetail() {
           setStudent({ ...data, records: sorted });
         }
       })
-      .catch(() => setError("데이터를 불러오는 중 오류 발생"))
-      .finally(() => setLoading(false));
+      .catch(() => alive && setError("데이터를 불러오는 중 오류 발생"))
+      .finally(() => alive && setLoading(false));
     return () => {
-      active = false;
+      alive = false;
     };
   }, [id]);
 
   const summary = useMemo(() => {
     if (!student?.records?.length) return null;
     const n = student.records.length;
-    const total = student.records.reduce(
+    const sum = student.records.reduce(
       (acc, r) => {
         acc.GR += Number(r.GR || 0);
         acc.RC += Number(r.RC || 0);
@@ -76,18 +75,16 @@ export default function StudentDetail() {
     );
     return {
       count: n,
-      GR: (total.GR / n).toFixed(1),
-      RC: (total.RC / n).toFixed(1),
-      Total: (total.Total / n).toFixed(1),
+      GR: (sum.GR / n).toFixed(1),
+      RC: (sum.RC / n).toFixed(1),
+      Total: (sum.Total / n).toFixed(1),
     };
   }, [student]);
 
   return (
     <div className="max-w-5xl mx-auto p-4">
       <div className="mb-4 text-sm text-gray-500">
-        <Link to="/" className="hover:underline">
-          ← 돌아가기
-        </Link>
+        <Link to="/login" className="hover:underline">← 로그인으로</Link>
       </div>
 
       <h1 className="text-2xl font-bold mb-4">학생 성적 상세</h1>
@@ -193,7 +190,6 @@ export default function StudentDetail() {
 }
 
 function pdfHref(session) {
-  // public/papers/시험지_2508_P1~H6_과정평가.pdf 형태로 연결
-  const fname = `시험지_${session}_P1~H6_과정평가.pdf`;
-  return `/papers/${encodeURIComponent(fname)}`;
+  // public/papers/시험지_{회차}_P1~H6_과정평가.pdf 규칙
+  return `/papers/${encodeURIComponent(`시험지_${session}_P1~H6_과정평가.pdf`)}`;
 }
